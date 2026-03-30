@@ -76,3 +76,130 @@ input:focus, select:focus, textarea:focus {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+/* ========================================
+   Markdown Editor (react-md-editor) Overrides
+   Match EC design tokens: dark toolbar, cream preview
+   ======================================== */
+
+.ec-md-editor .w-md-editor {
+  border: 1px solid var(--ec-card-border) !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+
+/* Toolbar — dark charcoal background */
+.ec-md-editor .w-md-editor-toolbar {
+  background-color: var(--ec-nav-bg) !important;
+  border-bottom: 1px solid #374151 !important;
+  padding: 6px 8px !important;
+}
+
+.ec-md-editor .w-md-editor-toolbar li > button {
+  color: var(--ec-nav-text) !important;
+}
+
+.ec-md-editor .w-md-editor-toolbar li > button:hover {
+  color: var(--ec-gold) !important;
+  background-color: rgba(216, 166, 87, 0.1) !important;
+}
+
+.ec-md-editor .w-md-editor-toolbar li > button:disabled {
+  color: #6B7280 !important;
+}
+
+.ec-md-editor .w-md-editor-toolbar li.active > button {
+  color: var(--ec-gold) !important;
+  background-color: rgba(216, 166, 87, 0.15) !important;
+}
+
+/* Toolbar divider */
+.ec-md-editor .w-md-editor-toolbar-divider {
+  background-color: #374151 !important;
+}
+
+/* Text area (editing pane) */
+.ec-md-editor .w-md-editor-text-input,
+.ec-md-editor .w-md-editor-text-pre,
+.ec-md-editor .w-md-editor-text-pre > code,
+.ec-md-editor .w-md-editor-text {
+  font-family: 'Libre Franklin', sans-serif !important;
+  font-size: 14px !important;
+  color: var(--ec-text) !important;
+}
+
+.ec-md-editor .w-md-editor-text-input {
+  caret-color: var(--ec-gold) !important;
+}
+
+/* Preview pane — warm cream background */
+.ec-md-editor .wmde-markdown {
+  background-color: #FAF7F3 !important;
+  font-family: 'Libre Franklin', sans-serif !important;
+  font-size: 14px !important;
+  color: var(--ec-text) !important;
+  padding: 16px !important;
+}
+
+.ec-md-editor .wmde-markdown h1,
+.ec-md-editor .wmde-markdown h2,
+.ec-md-editor .wmde-markdown h3,
+.ec-md-editor .wmde-markdown h4,
+.ec-md-editor .wmde-markdown h5,
+.ec-md-editor .wmde-markdown h6 {
+  font-family: 'Cormorant Garamond', serif !important;
+  color: var(--ec-text) !important;
+  border-bottom-color: var(--ec-card-border) !important;
+}
+
+.ec-md-editor .wmde-markdown a {
+  color: var(--ec-forest) !important;
+}
+
+.ec-md-editor .wmde-markdown a:hover {
+  color: var(--ec-forest-dark) !important;
+}
+
+.ec-md-editor .wmde-markdown blockquote {
+  border-left-color: var(--ec-gold) !important;
+  color: var(--ec-text-secondary) !important;
+}
+
+.ec-md-editor .wmde-markdown code {
+  background-color: rgba(216, 166, 87, 0.1) !important;
+  color: var(--ec-text) !important;
+}
+
+.ec-md-editor .wmde-markdown pre {
+  background-color: var(--ec-nav-bg) !important;
+}
+
+.ec-md-editor .wmde-markdown pre code {
+  color: var(--ec-nav-text) !important;
+  background-color: transparent !important;
+}
+
+.ec-md-editor .wmde-markdown hr {
+  border-color: var(--ec-card-border) !important;
+}
+
+/* Editor content area background */
+.ec-md-editor .w-md-editor-content {
+  background-color: #FFFFFF !important;
+}
+
+/* Divider between edit and preview */
+.ec-md-editor .w-md-editor-content .w-md-editor-preview {
+  border-left: 1px solid var(--ec-card-border) !important;
+}
+
+/* Focus state for the editor */
+.ec-md-editor .w-md-editor--fullscreen {
+  z-index: 60 !important;
+}
+
+.ec-md-editor .w-md-editor:focus-within {
+  box-shadow: 0 0 0 2px var(--ec-gold) !important;
+  border-color: var(--ec-gold) !important;
+}

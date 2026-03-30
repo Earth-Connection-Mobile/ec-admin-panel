@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import Table from '../components/Table'
 import Badge from '../components/Badge'
 import Modal from '../components/Modal'
@@ -15,6 +16,145 @@ const filterTabs = [
   { key: 'inactive', label: 'Inactive' },
 ]
 
+function InviteModal({ open, onClose }) {
+  const { session } = useAuth()
+  const [email, setEmail] = useState('')
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState(null)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (open) {
+      setEmail('')
+      setResult(null)
+      setSending(false)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [open])
+
+  const handleSend = async () => {
+    const trimmed = email.trim()
+    if (!trimmed) {
+      setResult({ type: 'error', message: 'Please enter an email address.' })
+      return
+    }
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setResult({ type: 'error', message: 'Please enter a valid email address.' })
+      return
+    }
+
+    setSending(true)
+    setResult(null)
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_URL
+      const response = await fetch(workerUrl + '/invite', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + session.access_token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: trimmed }),
+      })
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => 'Invite failed')
+        throw new Error(text)
+      }
+
+      setResult({ type: 'success', message: 'Invitation sent to ' + trimmed + '!' })
+      setEmail('')
+    } catch (err) {
+      console.error('Invite error:', err)
+      setResult({
+        type: 'error',
+        message: err.message || 'Failed to send invitation. Please try again.',
+      })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !sending) {
+      handleSend()
+    }
+  }
+
+  if (!open) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-md rounded-xl border border-[var(--ec-card-border)] bg-white p-6 shadow-lg">
+        <h3 className="font-heading text-[22px] font-semibold text-[var(--ec-text)]">
+          Invite Member
+        </h3>
+        <p className="mt-2 text-sm text-[var(--ec-text-secondary)] font-body">
+          Send an invitation email to a new community member. They will receive a magic link to create their account.
+        </p>
+
+        <div className="mt-4">
+          <label className="block text-[13px] font-medium text-[var(--ec-text)] font-body mb-1.5">
+            Email Address
+          </label>
+          <input
+            ref={inputRef}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="newmember@example.com"
+            disabled={sending}
+            className="w-full rounded-lg border border-[var(--ec-card-border)] bg-white px-3 py-3 text-sm text-[var(--ec-text)] font-body placeholder:text-[var(--ec-text-secondary)]/50 disabled:opacity-60"
+          />
+        </div>
+
+        {result && (
+          <div
+            className={
+              'mt-3 rounded-lg px-3 py-2 text-sm font-body ' +
+              (result.type === 'success'
+                ? 'border border-[var(--ec-forest)]/20 bg-[var(--ec-forest)]/5 text-[var(--ec-forest)]'
+                : 'border border-[var(--ec-rust)]/20 bg-[var(--ec-rust)]/5 text-[var(--ec-rust)]')
+            }
+          >
+            {result.message}
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            disabled={sending}
+            className="rounded-lg border border-[var(--ec-card-border)] bg-white px-4 py-2 text-sm font-medium text-[var(--ec-text)] font-body hover:bg-gray-50 transition-colors disabled:opacity-60"
+          >
+            {result?.type === 'success' ? 'Done' : 'Cancel'}
+          </button>
+          {result?.type !== 'success' && (
+            <button
+              onClick={handleSend}
+              disabled={sending}
+              className="rounded-lg bg-[var(--ec-gold)] px-4 py-2 text-sm font-medium text-[var(--ec-nav-bg)] font-body hover:bg-[var(--ec-gold-hover)] transition-colors disabled:opacity-60"
+            >
+              {sending ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current"></span>
+                  Sending...
+                </span>
+              ) : (
+                'Send Invite'
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Members() {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,6 +163,7 @@ export default function Members() {
   const [statusTarget, setStatusTarget] = useState(null)
   const [statusAction, setStatusAction] = useState(null)
   const [statusLoading, setStatusLoading] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -118,15 +259,15 @@ export default function Members() {
           <h1 className="font-heading text-[28px] font-bold text-[var(--ec-text)]">Members</h1>
           <p className="mt-1 text-sm text-[var(--ec-text-secondary)] font-body">Manage community membership and access.</p>
         </div>
-        <div className="relative group">
-          <button disabled className="inline-flex items-center gap-2 rounded-lg bg-[var(--ec-gold)] px-4 py-2 text-sm font-medium text-[var(--ec-nav-bg)] font-body opacity-50 cursor-not-allowed">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            Invite Member
-          </button>
-          <div className="absolute right-0 top-full mt-1 hidden group-hover:block">
-            <div className="rounded-lg bg-[var(--ec-nav-bg)] px-3 py-1.5 text-xs text-white font-body whitespace-nowrap shadow-lg">Coming soon</div>
-          </div>
-        </div>
+        <button
+          onClick={() => setInviteOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-[var(--ec-gold)] px-4 py-2 text-sm font-medium text-[var(--ec-nav-bg)] font-body hover:bg-[var(--ec-gold-hover)] transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Invite Member
+        </button>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -178,6 +319,11 @@ export default function Members() {
         confirmLabel={statusAction === 'deactivate' ? 'Deactivate' : 'Reactivate'}
         confirmColor={statusAction === 'deactivate' ? 'rust' : 'gold'}
         loading={statusLoading}
+      />
+
+      <InviteModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
       />
     </div>
   )

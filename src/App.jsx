@@ -6,7 +6,9 @@ import Dashboard from './pages/Dashboard'
 import Playlists from './pages/Playlists'
 import PlaylistEdit from './pages/PlaylistEdit'
 import Videos from './pages/Videos'
+import VideoEdit from './pages/VideoEdit'
 import Updates from './pages/Updates'
+import UpdateEdit from './pages/UpdateEdit'
 import Members from './pages/Members'
 
 function ProtectedRoute({ children }) {
@@ -36,13 +38,94 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
-          <Route path="/playlists/new" element={<ProtectedRoute><PlaylistEdit /></ProtectedRoute>} />
-          <Route path="/playlists/:id" element={<ProtectedRoute><PlaylistEdit /></ProtectedRoute>} />
-          <Route path="/videos" element={<ProtectedRoute><Videos /></ProtectedRoute>} />
-          <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
-          <Route path="/members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/playlists"
+            element={
+              <ProtectedRoute>
+                <Playlists />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/playlists/new"
+            element={
+              <ProtectedRoute>
+                <PlaylistEdit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/playlists/:id"
+            element={
+              <ProtectedRoute>
+                <PlaylistEdit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/videos"
+            element={
+              <ProtectedRoute>
+                <Videos />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/videos/new"
+            element={
+              <ProtectedRoute>
+                <VideoEdit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/videos/:id"
+            element={
+              <ProtectedRoute>
+                <VideoEdit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/updates"
+            element={
+              <ProtectedRoute>
+                <Updates />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/updates/new"
+            element={
+              <ProtectedRoute>
+                <UpdateEdit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/updates/:id"
+            element={
+              <ProtectedRoute>
+                <UpdateEdit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/members"
+            element={
+              <ProtectedRoute>
+                <Members />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
