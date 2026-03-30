@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { uploadToR2, generateFileKey } from '../lib/media'
+import { uploadToR2, generateFileKey, fetchImageAsBlob } from '../lib/media'
 import FileUpload from '../components/FileUpload'
 
 function getVideoDuration(file) {
@@ -75,7 +75,7 @@ export default function VideoEdit() {
           setVideoPreviewSrc(import.meta.env.VITE_WORKER_URL + '/media/' + data.video_file_url)
         }
         if (data.thumbnail_url) {
-          setThumbnailPreview(import.meta.env.VITE_WORKER_URL + '/media/' + data.thumbnail_url)
+          fetchImageAsBlob(data.thumbnail_url, session).then(url => { if (url) setThumbnailPreview(url) })
         }
       } catch (err) {
         console.error('Error loading video:', err)

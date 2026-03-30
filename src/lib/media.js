@@ -1,15 +1,10 @@
-/**
- * R2 Media Upload/Delete helpers via the Cloudflare Worker
- */
-
-const workerUrl = import.meta.env.VITE_WORKER_URL
+const WORKER_URL = import.meta.env.VITE_WORKER_URL
 
 /**
  * Upload a file to R2 via the Cloudflare Worker.
- * PUT /upload/<key> with Authorization header and Content-Type.
  */
 export async function uploadToR2(file, key, session) {
-  const response = await fetch(`${workerUrl}/upload/${key}`, {
+  const response = await fetch(`${WORKER_URL}/upload/${key}`, {
     method: 'PUT',
     headers: {
       'Authorization': `Bearer ${session.access_token}`,
@@ -18,35 +13,25 @@ export async function uploadToR2(file, key, session) {
     body: file,
   })
   if (!response.ok) {
-    const text = await response.text().catch(() => 'Upload failed')
-    throw new Error(text)
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.error || 'Upload failed')
   }
   return await response.json()
 }
 
 /**
- * Delete a file from R2 via the Cloudflare Worker.
- * DELETE /media/<key> with Authorization header.
+ * Delete a file from R2.
  */
 export async function deleteFromR2(key, session) {
-  const response = await fetch(`${workerUrl}/media/${key}`, {
+  const response = await fetch(`${WORKER_URL}/media/${key}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${session.access_token}`,
-    },
+    headers: { 'Authorization': `Bearer ${session.access_token}` },
   })
-  if (!response.ok) {
-    const text = await response.text().catch(() => 'Delete failed')
-    throw new Error(text)
-  }
-  return await response.json()
+  if (!response.ok) throw new Error('Delete failed')
 }
 
 /**
  * Generate a unique R2 key for a file.
- * @param {string} prefix - e.g. "audio", "covers"
- * @param {string} filename - original filename
- * @returns {string} key like "audio/abc123-def456.mp3"
  */
 export function generateFileKey(prefix, filename) {
   const uuid = crypto.randomUUID()
@@ -55,34 +40,54 @@ export function generateFileKey(prefix, filename) {
 }
 
 /**
- * Extract audio duration (in seconds) using the Web Audio API.
- * Returns an integer (rounded).
+ * Get the full media URL for an R2 key (for use with auth headers).
+ */
+export function getMediaUrl(key) {
+  return `${WORKER_URL}/media/${key}`
+}
+
+/**
+ * Fetch an image from R2 with auth and return a blob URL for display.
+ * Regular <img> tags can't send Bearer tokens, so we fetch manually.
+ */
+export async function fetchImageAsBlob(key, session) {
+  try {
+    const response = await fetch(`${WORKER_URL}/media/${key}`, {
+      headers: { 'Authorization': `Bearer ${session.access_token}` },
+    })
+    if (!response.ok) return null
+    const blob = await response.blob()
+    return URL.createObjectURL(blob)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Extract audio duration using Web Audio API.
  */
 export async function getAudioDuration(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-        const audioBuffer = await audioContext.decodeAudioData(e.target.result)
-        const seconds = Math.round(audioBuffer.duration)
-        audioContext.close()
-        resolve(seconds)
-      } catch (err) {
-        reject(new Error('Could not decode audio: ' + err.message))
-      }
-    }
-    reader.onerror = () => reject(new Error('Could not read file'))
-    reader.readAsArrayBuffer(file)
+  return new Promise((resolve) => {
+    const audio = new Audio()
+    audio.src = URL.createObjectURL(file)
+    audio.addEventListener('loadedmetadata', () => {
+      const duration = Math.round(audio.duration)
+      URL.revokeObjectURL(audio.src)
+      resolve(duration)
+    })
+    audio.addEventListener('error', () => {
+      URL.revokeObjectURL(audio.src)
+      resolve(0)
+    })
   })
 }
 
 /**
- * Format seconds into mm:ss display string.
+ * Format seconds to m:ss display.
  */
-export function formatDuration(totalSeconds) {
-  if (!totalSeconds || totalSeconds <= 0) return '0:00'
-  const mins = Math.floor(totalSeconds / 60)
-  const secs = totalSeconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+export function formatDuration(seconds) {
+  if (!seconds) return '0:00'
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
 }

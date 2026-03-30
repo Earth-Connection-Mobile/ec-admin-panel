@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import MDEditor from '@uiw/react-md-editor'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { uploadToR2, generateFileKey } from '../lib/media'
+import { uploadToR2, generateFileKey, fetchImageAsBlob } from '../lib/media'
 import FileUpload from '../components/FileUpload'
 
 export default function UpdateEdit() {
@@ -45,7 +45,7 @@ export default function UpdateEdit() {
             : new Date().toISOString().slice(0, 16)
         )
         if (data.cover_image_url) {
-          setCoverImagePreview(import.meta.env.VITE_WORKER_URL + '/media/' + data.cover_image_url)
+          fetchImageAsBlob(data.cover_image_url, session).then(url => { if (url) setCoverImagePreview(url) })
         }
       } catch (err) {
         console.error('Error loading update:', err)

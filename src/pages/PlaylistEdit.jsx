@@ -26,7 +26,7 @@ function TrackForm({ initialData, onSave, onCancel, session }) {
 
   useEffect(() => {
     if (initialData?.cover_art_url) {
-      setCoverArtPreview(import.meta.env.VITE_WORKER_URL + '/media/' + initialData.cover_art_url)
+      fetchImageAsBlob(initialData.cover_art_url, session).then(url => { if (url) setCoverArtPreview(url) })
     }
   }, [initialData])
 
@@ -194,7 +194,7 @@ export default function PlaylistEdit() {
         setTitle(playlist.title); setDescription(playlist.description || ''); setPhaseTag(playlist.phase_tag)
         setCoverArtKey(playlist.cover_art_url || ''); setIsFeatured(playlist.is_featured)
         setPublishedAt(playlist.published_at ? new Date(playlist.published_at).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16))
-        if (playlist.cover_art_url) setCoverArtPreview(import.meta.env.VITE_WORKER_URL + '/media/' + playlist.cover_art_url)
+        if (playlist.cover_art_url) fetchImageAsBlob(playlist.cover_art_url, session).then(url => { if (url) setCoverArtPreview(url) })
         const { data: td, error: tErr } = await supabase.from('tracks').select('*').eq('playlist_id', id).order('track_order', { ascending: true })
         if (tErr) throw tErr
         setTracks((td || []).map((t) => ({ ...t, _status: 'saved' })))
