@@ -12,15 +12,18 @@ export function AuthProvider({ children }) {
 
   const checkAdminRole = useCallback(async (userId) => {
     try {
+      console.log('[Auth] Checking admin role for:', userId)
       const { data, error } = await supabase
         .from('members')
         .select('role, status')
         .eq('id', userId)
         .single()
 
+      console.log('[Auth] Member query result:', { data, error })
       if (error || !data) return false
       return data.role === 'admin' && data.status === 'active'
-    } catch {
+    } catch (e) {
+      console.error('[Auth] checkAdminRole error:', e)
       return false
     }
   }, [])
@@ -30,11 +33,14 @@ export function AuthProvider({ children }) {
     initDone.current = true
 
     const init = async () => {
+      console.log('[Auth] Init starting...')
+      
       // Check for SSO token
       const params = new URLSearchParams(window.location.search)
       const token = params.get('token')
 
       if (token) {
+        console.log('[Auth] SSO token found')
         window.history.replaceState({}, '', window.location.pathname)
         try {
           const { data } = await supabase.auth.setSession({
@@ -49,29 +55,42 @@ export function AuthProvider({ children }) {
               setIsAdmin(true)
             }
           }
-        } catch { /* fall through */ }
+        } catch (e) {
+          console.error('[Auth] SSO error:', e)
+        }
         setIsLoading(false)
+        console.log('[Auth] Init complete (SSO path)')
         return
       }
 
       // Check existing session
-      const { data: { session: existing } } = await supabase.auth.getSession()
-      if (existing?.user) {
-        const admin = await checkAdminRole(existing.user.id)
-        if (admin) {
-          setSession(existing)
-          setUser(existing.user)
-          setIsAdmin(true)
+      console.log('[Auth] Checking existing session...')
+      try {
+        const { data: { session: existing }, error } = await supabase.auth.getSession()
+        console.log('[Auth] Existing session:', existing ? 'found' : 'none', error || '')
+        
+        if (existing?.user) {
+          const admin = await checkAdminRole(existing.user.id)
+          console.log('[Auth] Admin check:', admin)
+          if (admin) {
+            setSession(existing)
+            setUser(existing.user)
+            setIsAdmin(true)
+          }
         }
+      } catch (e) {
+        console.error('[Auth] getSession error:', e)
       }
+      
       setIsLoading(false)
+      console.log('[Auth] Init complete')
     }
 
     init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
-        // Only handle sign-out events here — sign-in is handled by signIn()
+        console.log('[Auth] onAuthStateChange:', _event)
         if (!newSession) {
           setSession(null)
           setUser(null)
@@ -85,13 +104,16 @@ export function AuthProvider({ children }) {
 
   const signIn = useCallback(async (email, password) => {
     setIsLoading(true)
+    console.log('[Auth] Signing in:', email)
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
+      console.error('[Auth] Sign in error:', error)
       setIsLoading(false)
       return { error: error.message }
     }
 
+    console.log('[Auth] Sign in success, checking admin...')
     const admin = await checkAdminRole(data.user.id)
     if (!admin) {
       await supabase.auth.signOut()
