@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 
 const AuthContext = createContext(null)
@@ -8,103 +8,90 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const initDone = useRef(false)
 
   const checkAdminRole = useCallback(async (userId) => {
-    const { data, error } = await supabase
-      .from('members')
-      .select('role, status')
-      .eq('id', userId)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('members')
+        .select('role, status')
+        .eq('id', userId)
+        .single()
 
-    if (error || !data) return false
-    return data.role === 'admin' && data.status === 'active'
+      if (error || !data) return false
+      return data.role === 'admin' && data.status === 'active'
+    } catch {
+      return false
+    }
   }, [])
 
-  const handleSession = useCallback(async (newSession) => {
-    if (!newSession?.user) {
-      setSession(null)
-      setUser(null)
-      setIsAdmin(false)
-      setIsLoading(false)
-      return
-    }
-
-    setSession(newSession)
-    setUser(newSession.user)
-
-    const admin = await checkAdminRole(newSession.user.id)
-    setIsAdmin(admin)
-
-    if (!admin) {
-      // Sign out non-admin users
-      await supabase.auth.signOut()
-      setSession(null)
-      setUser(null)
-      setIsAdmin(false)
-    }
-
-    setIsLoading(false)
-  }, [checkAdminRole])
-
   useEffect(() => {
-    // Check for SSO token from URL parameter (mobile app handoff)
-    const handleSSOToken = async () => {
+    if (initDone.current) return
+    initDone.current = true
+
+    const init = async () => {
+      // Check for SSO token
       const params = new URLSearchParams(window.location.search)
       const token = params.get('token')
 
       if (token) {
-        // Strip token from URL to avoid leaking in browser history
         window.history.replaceState({}, '', window.location.pathname)
-
         try {
-          const { data, error } = await supabase.auth.setSession({
+          const { data } = await supabase.auth.setSession({
             access_token: token,
             refresh_token: token,
           })
-          if (!error && data?.session) {
-            await handleSession(data.session)
-            return true
+          if (data?.session) {
+            const admin = await checkAdminRole(data.session.user.id)
+            if (admin) {
+              setSession(data.session)
+              setUser(data.session.user)
+              setIsAdmin(true)
+            }
           }
-        } catch {
-          // Fall through to normal session check
+        } catch { /* fall through */ }
+        setIsLoading(false)
+        return
+      }
+
+      // Check existing session
+      const { data: { session: existing } } = await supabase.auth.getSession()
+      if (existing?.user) {
+        const admin = await checkAdminRole(existing.user.id)
+        if (admin) {
+          setSession(existing)
+          setUser(existing.user)
+          setIsAdmin(true)
         }
       }
-      return false
-    }
-
-    const init = async () => {
-      const ssoHandled = await handleSSOToken()
-      if (ssoHandled) return
-
-      const { data: { session: existingSession } } = await supabase.auth.getSession()
-      await handleSession(existingSession)
+      setIsLoading(false)
     }
 
     init()
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        await handleSession(newSession)
+      (_event, newSession) => {
+        // Only handle sign-out events here — sign-in is handled by signIn()
+        if (!newSession) {
+          setSession(null)
+          setUser(null)
+          setIsAdmin(false)
+        }
       }
     )
 
     return () => subscription.unsubscribe()
-  }, [handleSession])
+  }, [checkAdminRole])
 
   const signIn = useCallback(async (email, password) => {
     setIsLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setIsLoading(false)
       return { error: error.message }
     }
 
-    // Check admin role
     const admin = await checkAdminRole(data.user.id)
     if (!admin) {
       await supabase.auth.signOut()
@@ -135,8 +122,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider')
   return context
 }
