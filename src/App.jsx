@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
+import { PreviewProvider } from './lib/preview'
+import { ToastProvider } from './components/Toast'
+import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -34,100 +37,29 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/playlists"
-            element={
-              <ProtectedRoute>
-                <Playlists />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/playlists/new"
-            element={
-              <ProtectedRoute>
-                <PlaylistEdit />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/playlists/:id"
-            element={
-              <ProtectedRoute>
-                <PlaylistEdit />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/videos"
-            element={
-              <ProtectedRoute>
-                <Videos />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/videos/new"
-            element={
-              <ProtectedRoute>
-                <VideoEdit />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/videos/:id"
-            element={
-              <ProtectedRoute>
-                <VideoEdit />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/updates"
-            element={
-              <ProtectedRoute>
-                <Updates />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/updates/new"
-            element={
-              <ProtectedRoute>
-                <UpdateEdit />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/updates/:id"
-            element={
-              <ProtectedRoute>
-                <UpdateEdit />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/members"
-            element={
-              <ProtectedRoute>
-                <Members />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <PreviewProvider>
+            <ToastProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
+                <Route path="/playlists/new" element={<ProtectedRoute><PlaylistEdit /></ProtectedRoute>} />
+                <Route path="/playlists/:id" element={<ProtectedRoute><PlaylistEdit /></ProtectedRoute>} />
+                <Route path="/videos" element={<ProtectedRoute><Videos /></ProtectedRoute>} />
+                <Route path="/videos/new" element={<ProtectedRoute><VideoEdit /></ProtectedRoute>} />
+                <Route path="/videos/:id" element={<ProtectedRoute><VideoEdit /></ProtectedRoute>} />
+                <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
+                <Route path="/updates/new" element={<ProtectedRoute><UpdateEdit /></ProtectedRoute>} />
+                <Route path="/updates/:id" element={<ProtectedRoute><UpdateEdit /></ProtectedRoute>} />
+                <Route path="/members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
+              </Routes>
+            </ToastProvider>
+          </PreviewProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
