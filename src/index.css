@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Franklin:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
+@import "tailwindcss";
+
+/* EC Design Tokens */
+:root {
+  --ec-bg: #F2EBE3;
+  --ec-card: #FFFFFF;
+  --ec-card-border: #E8E4DF;
+  --ec-nav-bg: #1F2937;
+  --ec-nav-text: #F2EBE3;
+  --ec-nav-active: #D8A657;
+  --ec-gold: #D8A657;
+  --ec-gold-hover: #C4943F;
+  --ec-gold-light: #F3D28B;
+  --ec-forest: #2D6A4F;
+  --ec-forest-dark: #1B4332;
+  --ec-rust: #9C4A1A;
+  --ec-text: #1F2937;
+  --ec-text-secondary: #4B5563;
+  --ec-text-on-dark: #F2EBE3;
+}
+
+/* Base typography */
+body {
+  font-family: 'Libre Franklin', sans-serif;
+  color: var(--ec-text);
+  background-color: var(--ec-bg);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3 {
+  font-family: 'Cormorant Garamond', serif;
+}
+
+/* Custom Tailwind theme extensions via @theme */
+@theme {
+  --color-ec-bg: #F2EBE3;
+  --color-ec-card: #FFFFFF;
+  --color-ec-card-border: #E8E4DF;
+  --color-ec-nav-bg: #1F2937;
+  --color-ec-nav-text: #F2EBE3;
+  --color-ec-nav-active: #D8A657;
+  --color-ec-gold: #D8A657;
+  --color-ec-gold-hover: #C4943F;
+  --color-ec-gold-light: #F3D28B;
+  --color-ec-forest: #2D6A4F;
+  --color-ec-forest-dark: #1B4332;
+  --color-ec-rust: #9C4A1A;
+  --color-ec-text: #1F2937;
+  --color-ec-text-secondary: #4B5563;
+  --color-ec-text-on-dark: #F2EBE3;
+  --font-heading: 'Cormorant Garamond', serif;
+  --font-body: 'Libre Franklin', sans-serif;
+}
+
+/* Focus ring utility */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ec-gold);
+  border-color: var(--ec-gold);
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--ec-card-border);
+  border-top-color: var(--ec-gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
