@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Playlists from './pages/Playlists'
+import PlaylistEdit from './pages/PlaylistEdit'
 import Videos from './pages/Videos'
 import Updates from './pages/Updates'
 import Members from './pages/Members'
@@ -35,46 +36,13 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/playlists"
-            element={
-              <ProtectedRoute>
-                <Playlists />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/videos"
-            element={
-              <ProtectedRoute>
-                <Videos />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/updates"
-            element={
-              <ProtectedRoute>
-                <Updates />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/members"
-            element={
-              <ProtectedRoute>
-                <Members />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
+          <Route path="/playlists/new" element={<ProtectedRoute><PlaylistEdit /></ProtectedRoute>} />
+          <Route path="/playlists/:id" element={<ProtectedRoute><PlaylistEdit /></ProtectedRoute>} />
+          <Route path="/videos" element={<ProtectedRoute><Videos /></ProtectedRoute>} />
+          <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
+          <Route path="/members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
