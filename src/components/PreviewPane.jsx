@@ -128,6 +128,7 @@ export default function PreviewPane() {
             title={previewData.data.title}
             body={previewData.data.body}
             publishedAt={previewData.data.publishedAt}
+            coverImageUrl={previewData.data.coverImageUrl}
           />
         )
       default:

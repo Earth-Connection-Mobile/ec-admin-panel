@@ -37,9 +37,10 @@ export default function UpdateEdit() {
         title,
         body,
         publishedAt,
+        coverImageUrl: coverImagePreview,
       },
     })
-  }, [title, body, publishedAt, setPreviewData])
+  }, [title, body, publishedAt, coverImagePreview, setPreviewData])
 
   // Clear preview on unmount
   useEffect(() => {
