@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { uploadToR2, deleteFromR2, generateFileKey, getAudioDuration, formatDuration, fetchImageAsBlob } from '../lib/media'
+import { usePreview } from '../lib/preview'
+import { useToast } from '../components/Toast'
+import { uploadToR2, deleteFromR2, generateFileKey, getAudioDuration, formatDuration } from '../lib/media'
 import FileUpload from '../components/FileUpload'
 import Modal from '../components/Modal'
 
@@ -26,7 +28,7 @@ function TrackForm({ initialData, onSave, onCancel, session }) {
 
   useEffect(() => {
     if (initialData?.cover_art_url) {
-      fetchImageAsBlob(initialData.cover_art_url, session).then(url => { if (url) setCoverArtPreview(url) })
+      setCoverArtPreview(import.meta.env.VITE_WORKER_URL + '/media/' + initialData.cover_art_url)
     }
   }, [initialData])
 
@@ -161,6 +163,8 @@ export default function PlaylistEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
+  const { setPreviewData } = usePreview()
+  const { showToast } = useToast()
   const isNew = !id
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -185,6 +189,25 @@ export default function PlaylistEdit() {
   const dragItem = useRef(null)
   const dragOverItem = useRef(null)
 
+  // Update preview pane data whenever form state changes
+  useEffect(() => {
+    setPreviewData({
+      type: 'playlist',
+      data: {
+        title,
+        description,
+        phaseTag,
+        coverArtUrl: coverArtPreview,
+        trackCount: tracks.length,
+      },
+    })
+  }, [title, description, phaseTag, coverArtPreview, tracks.length, setPreviewData])
+
+  // Clear preview on unmount
+  useEffect(() => {
+    return () => setPreviewData(null)
+  }, [setPreviewData])
+
   useEffect(() => {
     if (isNew) return
     const load = async () => {
@@ -194,7 +217,7 @@ export default function PlaylistEdit() {
         setTitle(playlist.title); setDescription(playlist.description || ''); setPhaseTag(playlist.phase_tag)
         setCoverArtKey(playlist.cover_art_url || ''); setIsFeatured(playlist.is_featured)
         setPublishedAt(playlist.published_at ? new Date(playlist.published_at).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16))
-        if (playlist.cover_art_url) fetchImageAsBlob(playlist.cover_art_url, session).then(url => { if (url) setCoverArtPreview(url) })
+        if (playlist.cover_art_url) setCoverArtPreview(import.meta.env.VITE_WORKER_URL + '/media/' + playlist.cover_art_url)
         const { data: td, error: tErr } = await supabase.from('tracks').select('*').eq('playlist_id', id).order('track_order', { ascending: true })
         if (tErr) throw tErr
         setTracks((td || []).map((t) => ({ ...t, _status: 'saved' })))
@@ -212,10 +235,17 @@ export default function PlaylistEdit() {
 
   const handleCoverFile = useCallback(async (file) => {
     setCoverArtFile(file); setCoverArtPreview(URL.createObjectURL(file)); setDirty(true); setCoverUploading(true)
-    try { const key = generateFileKey('covers', file.name); await uploadToR2(file, key, session); setCoverArtKey(key) }
-    catch (err) { console.error('Cover upload error:', err); setError('Failed to upload cover art.') }
-    finally { setCoverUploading(false) }
-  }, [session])
+    try {
+      const key = generateFileKey('covers', file.name)
+      await uploadToR2(file, key, session)
+      setCoverArtKey(key)
+      showToast('Cover art uploaded', 'success')
+    } catch (err) {
+      console.error('Cover upload error:', err)
+      setError('Failed to upload cover art.')
+      showToast('Failed to upload cover art', 'error')
+    } finally { setCoverUploading(false) }
+  }, [session, showToast])
 
   const handleClearCover = useCallback(() => { setCoverArtKey(''); setCoverArtPreview(null); setCoverArtFile(null); setDirty(true) }, [])
 
@@ -241,9 +271,14 @@ export default function PlaylistEdit() {
         if (track._status === 'new') { const { error } = await supabase.from('tracks').insert(td); if (error) throw error }
         else if (track._status === 'saved' || track._status === 'modified') { const { error } = await supabase.from('tracks').update(td).eq('id', track.id); if (error) throw error }
       }
-      setDirty(false); navigate('/playlists')
-    } catch (err) { console.error('Save error:', err); setError('Failed to save playlist: ' + err.message) }
-    finally { setSaving(false) }
+      setDirty(false)
+      showToast('Playlist saved successfully', 'success')
+      navigate('/playlists')
+    } catch (err) {
+      console.error('Save error:', err)
+      setError('Failed to save playlist: ' + err.message)
+      showToast('Failed to save playlist', 'error')
+    } finally { setSaving(false) }
   }
 
   const handleAddTrack = (formData) => { setTracks((prev) => [...prev, { ...formData, id: crypto.randomUUID(), track_order: prev.length + 1, _status: 'new' }]); setShowAddTrack(false); setDirty(true) }
@@ -255,9 +290,14 @@ export default function PlaylistEdit() {
     try {
       if (deleteTrackTarget._status !== 'new') { const { error } = await supabase.from('tracks').delete().eq('id', deleteTrackTarget.id); if (error) throw error }
       if (deleteTrackTarget.audio_file_url) { try { await deleteFromR2(deleteTrackTarget.audio_file_url, session) } catch (_e) { void _e } }
+      if (deleteTrackTarget.cover_art_url) { try { await deleteFromR2(deleteTrackTarget.cover_art_url, session) } catch (_e) { void _e } }
       setTracks((prev) => prev.filter((t) => t.id !== deleteTrackTarget.id)); setDeleteTrackTarget(null); setDirty(true)
-    } catch (err) { console.error('Delete track error:', err); setError('Failed to delete track.') }
-    finally { setDeletingTrack(false) }
+      showToast('Track deleted', 'success')
+    } catch (err) {
+      console.error('Delete track error:', err)
+      setError('Failed to delete track.')
+      showToast('Failed to delete track', 'error')
+    } finally { setDeletingTrack(false) }
   }
 
   const handleBulkUpload = async (fileList) => {
@@ -280,8 +320,10 @@ export default function PlaylistEdit() {
         return { id: crypto.randomUUID(), title: trackTitle, artist_healer: '', duration_seconds: duration, audio_file_url: key, cover_art_url: null, track_order: 0, _status: 'new', _needsArtist: true }
       } catch (err) { console.error('Bulk upload error for', file.name, err); return null }
     }))
-    setTracks((prev) => [...prev, ...results.filter(Boolean)].map((t, i) => ({ ...t, track_order: i + 1 })))
+    const uploaded = results.filter(Boolean)
+    setTracks((prev) => [...prev, ...uploaded].map((t, i) => ({ ...t, track_order: i + 1 })))
     setBulkUploading(false); setBulkProgress(0)
+    showToast(uploaded.length + ' track' + (uploaded.length !== 1 ? 's' : '') + ' uploaded', 'success')
   }
 
   const handleDragStart = (i) => { dragItem.current = i }

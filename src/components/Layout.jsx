@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import PreviewPane, { PreviewToggle, usePreviewPaneState } from './PreviewPane'
 
 const navItems = [
   {
@@ -54,6 +55,7 @@ export default function Layout({ children }) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { isOpen: previewOpen, toggle: togglePreview } = usePreviewPaneState()
 
   const handleSignOut = async () => {
     await signOut()
@@ -152,12 +154,22 @@ export default function Layout({ children }) {
           </span>
         </header>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1200px] px-6 py-8">
-            {children}
-          </div>
-        </main>
+        {/* Content + Preview side by side */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Scrollable main content */}
+          <main className="flex-1 overflow-y-auto">
+            {/* Preview toggle in the top-right corner of content area */}
+            <div className="hidden lg:flex justify-end px-6 pt-4 pb-0">
+              <PreviewToggle isOpen={previewOpen} onToggle={togglePreview} />
+            </div>
+            <div className="mx-auto max-w-[1200px] px-6 py-8 lg:pt-4">
+              {children}
+            </div>
+          </main>
+
+          {/* Preview pane - right side, desktop only */}
+          {previewOpen && <PreviewPane />}
+        </div>
       </div>
     </div>
   )

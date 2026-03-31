@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import MDEditor from '@uiw/react-md-editor'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { usePreview } from '../lib/preview'
+import { useToast } from '../components/Toast'
 import { uploadToR2, generateFileKey, fetchImageAsBlob } from '../lib/media'
 import FileUpload from '../components/FileUpload'
 
@@ -10,6 +12,8 @@ export default function UpdateEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
+  const { setPreviewData } = usePreview()
+  const { showToast } = useToast()
   const isNew = !id
 
   const [title, setTitle] = useState('')
@@ -24,6 +28,23 @@ export default function UpdateEdit() {
   const [coverUploading, setCoverUploading] = useState(false)
   const [error, setError] = useState(null)
   const [dirty, setDirty] = useState(false)
+
+  // Update preview pane data whenever form state changes
+  useEffect(() => {
+    setPreviewData({
+      type: 'update',
+      data: {
+        title,
+        body,
+        publishedAt,
+      },
+    })
+  }, [title, body, publishedAt, setPreviewData])
+
+  // Clear preview on unmount
+  useEffect(() => {
+    return () => setPreviewData(null)
+  }, [setPreviewData])
 
   useEffect(() => {
     if (isNew) return
@@ -74,13 +95,15 @@ export default function UpdateEdit() {
       const key = generateFileKey('images', file.name)
       await uploadToR2(file, key, session)
       setCoverImageUrl(key)
+      showToast('Cover image uploaded', 'success')
     } catch (err) {
       console.error('Cover upload error:', err)
       setError('Failed to upload cover image.')
+      showToast('Failed to upload cover image', 'error')
     } finally {
       setCoverUploading(false)
     }
-  }, [session])
+  }, [session, showToast])
 
   const handleClearCover = useCallback(() => {
     setCoverImageUrl('')
@@ -109,10 +132,12 @@ export default function UpdateEdit() {
         if (updateErr) throw updateErr
       }
       setDirty(false)
+      showToast('Update saved successfully', 'success')
       navigate('/updates')
     } catch (err) {
       console.error('Save error:', err)
       setError('Failed to save update: ' + err.message)
+      showToast('Failed to save update', 'error')
     } finally {
       setSaving(false)
     }

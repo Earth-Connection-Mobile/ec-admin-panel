@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { useToast } from '../components/Toast'
 import Table from '../components/Table'
 import Badge from '../components/Badge'
 import Modal from '../components/Modal'
@@ -18,6 +19,7 @@ const filterTabs = [
 
 function InviteModal({ open, onClose }) {
   const { session } = useAuth()
+  const { showToast } = useToast()
   const [email, setEmail] = useState('')
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
@@ -44,6 +46,11 @@ function InviteModal({ open, onClose }) {
       return
     }
 
+    if (!session) {
+      setResult({ type: 'error', message: 'Session expired. Please refresh the page.' })
+      return
+    }
+
     setSending(true)
     setResult(null)
     try {
@@ -64,12 +71,14 @@ function InviteModal({ open, onClose }) {
 
       setResult({ type: 'success', message: 'Invitation sent to ' + trimmed + '!' })
       setEmail('')
+      showToast('Invitation sent to ' + trimmed, 'success')
     } catch (err) {
       console.error('Invite error:', err)
       setResult({
         type: 'error',
         message: err.message || 'Failed to send invitation. Please try again.',
       })
+      showToast('Failed to send invitation', 'error')
     } finally {
       setSending(false)
     }
@@ -156,6 +165,7 @@ function InviteModal({ open, onClose }) {
 }
 
 export default function Members() {
+  const { showToast } = useToast()
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -202,10 +212,17 @@ export default function Members() {
       const { error } = await supabase.from('members').update({ status: newStatus }).eq('id', statusTarget.id)
       if (error) throw error
       setMembers((prev) => prev.map((m) => m.id === statusTarget.id ? { ...m, status: newStatus } : m))
+      showToast(
+        statusAction === 'deactivate'
+          ? statusTarget.email + ' has been deactivated'
+          : statusTarget.email + ' has been reactivated',
+        'success'
+      )
       setStatusTarget(null)
       setStatusAction(null)
     } catch (err) {
       console.error('Error updating member status:', err)
+      showToast('Failed to update member status', 'error')
     } finally {
       setStatusLoading(false)
     }

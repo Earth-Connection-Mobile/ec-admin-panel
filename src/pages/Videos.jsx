@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
+import { deleteFromR2 } from '../lib/media'
+import { useToast } from '../components/Toast'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 
@@ -17,6 +20,8 @@ function formatDuration(seconds) {
 }
 
 export default function Videos() {
+  const { session } = useAuth()
+  const { showToast } = useToast()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -26,7 +31,7 @@ export default function Videos() {
     try {
       const { data, error } = await supabase
         .from('videos')
-        .select('id, title, duration_seconds, published_at, thumbnail_url')
+        .select('id, title, duration_seconds, published_at, thumbnail_url, video_file_url')
         .order('published_at', { ascending: false })
       if (error) throw error
       setVideos(data || [])
@@ -45,10 +50,23 @@ export default function Videos() {
     try {
       const { error } = await supabase.from('videos').delete().eq('id', deleteTarget.id)
       if (error) throw error
+
+      // Clean up R2 files
+      if (session) {
+        if (deleteTarget.video_file_url) {
+          try { await deleteFromR2(deleteTarget.video_file_url, session) } catch (_e) { void _e }
+        }
+        if (deleteTarget.thumbnail_url) {
+          try { await deleteFromR2(deleteTarget.thumbnail_url, session) } catch (_e) { void _e }
+        }
+      }
+
       setVideos((prev) => prev.filter((v) => v.id !== deleteTarget.id))
       setDeleteTarget(null)
+      showToast('Video deleted', 'success')
     } catch (err) {
       console.error('Error deleting video:', err)
+      showToast('Failed to delete video', 'error')
     } finally {
       setDeleting(false)
     }

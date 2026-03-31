@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { usePreview } from '../lib/preview'
+import { useToast } from '../components/Toast'
 import { uploadToR2, generateFileKey, fetchImageAsBlob } from '../lib/media'
 import FileUpload from '../components/FileUpload'
 
@@ -33,6 +35,8 @@ export default function VideoEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
+  const { setPreviewData } = usePreview()
+  const { showToast } = useToast()
   const isNew = !id
 
   const [title, setTitle] = useState('')
@@ -50,6 +54,24 @@ export default function VideoEdit() {
   const [thumbUploading, setThumbUploading] = useState(false)
   const [error, setError] = useState(null)
   const [dirty, setDirty] = useState(false)
+
+  // Update preview pane data whenever form state changes
+  useEffect(() => {
+    setPreviewData({
+      type: 'video',
+      data: {
+        title,
+        description,
+        thumbnailUrl: thumbnailPreview,
+        duration: durationSeconds,
+      },
+    })
+  }, [title, description, thumbnailPreview, durationSeconds, setPreviewData])
+
+  // Clear preview on unmount
+  useEffect(() => {
+    return () => setPreviewData(null)
+  }, [setPreviewData])
 
   useEffect(() => {
     if (isNew) return
@@ -108,13 +130,15 @@ export default function VideoEdit() {
       await uploadToR2(file, key, session)
       setVideoFileUrl(key)
       setVideoPreviewSrc(import.meta.env.VITE_WORKER_URL + '/media/' + key)
+      showToast('Video file uploaded', 'success')
     } catch (err) {
       console.error('Video upload error:', err)
       setError('Failed to upload video file.')
+      showToast('Failed to upload video', 'error')
     } finally {
       setVideoUploading(false)
     }
-  }, [session])
+  }, [session, showToast])
 
   const handleClearVideo = useCallback(() => {
     setVideoFileUrl('')
@@ -132,13 +156,15 @@ export default function VideoEdit() {
       const key = generateFileKey('thumb', file.name)
       await uploadToR2(file, key, session)
       setThumbnailUrl(key)
+      showToast('Thumbnail uploaded', 'success')
     } catch (err) {
       console.error('Thumbnail upload error:', err)
       setError('Failed to upload thumbnail.')
+      showToast('Failed to upload thumbnail', 'error')
     } finally {
       setThumbUploading(false)
     }
-  }, [session])
+  }, [session, showToast])
 
   const handleClearThumbnail = useCallback(() => {
     setThumbnailUrl('')
@@ -167,10 +193,12 @@ export default function VideoEdit() {
         if (updateErr) throw updateErr
       }
       setDirty(false)
+      showToast('Video saved successfully', 'success')
       navigate('/videos')
     } catch (err) {
       console.error('Save error:', err)
       setError('Failed to save video: ' + err.message)
+      showToast('Failed to save video', 'error')
     } finally {
       setSaving(false)
     }

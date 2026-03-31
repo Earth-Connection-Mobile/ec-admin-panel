@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { fetchImageAsBlob } from '../lib/media'
+import { fetchImageAsBlob, deleteFromR2 } from '../lib/media'
+import { useToast } from '../components/Toast'
 import Table from '../components/Table'
 import Badge from '../components/Badge'
 import Modal from '../components/Modal'
@@ -20,6 +21,7 @@ const phaseConfig = {
 
 export default function Playlists() {
   const { session } = useAuth()
+  const { showToast } = useToast()
   const [playlists, setPlaylists] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -68,8 +70,13 @@ export default function Playlists() {
         await supabase.from('playlists').update({ is_featured: true }).eq('id', playlist.id)
       }
       await fetchPlaylists()
+      showToast(
+        playlist.is_featured ? 'Playlist unfeatured' : '"' + playlist.title + '" is now featured',
+        'success'
+      )
     } catch (err) {
       console.error('Error toggling featured:', err)
+      showToast('Failed to update featured status', 'error')
     } finally {
       setFeatureLoading(null)
     }
@@ -79,12 +86,32 @@ export default function Playlists() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
+      // Fetch tracks to clean up their audio files from R2
+      const { data: tracks } = await supabase.from('tracks').select('audio_file_url, cover_art_url').eq('playlist_id', deleteTarget.id)
       const { error } = await supabase.from('playlists').delete().eq('id', deleteTarget.id)
       if (error) throw error
+
+      // Clean up R2 files: cover art, track audio, track cover art
+      if (session) {
+        if (deleteTarget.cover_art_url) {
+          try { await deleteFromR2(deleteTarget.cover_art_url, session) } catch (_e) { void _e }
+        }
+        for (const track of (tracks || [])) {
+          if (track.audio_file_url) {
+            try { await deleteFromR2(track.audio_file_url, session) } catch (_e) { void _e }
+          }
+          if (track.cover_art_url) {
+            try { await deleteFromR2(track.cover_art_url, session) } catch (_e) { void _e }
+          }
+        }
+      }
+
       setPlaylists((prev) => prev.filter((p) => p.id !== deleteTarget.id))
       setDeleteTarget(null)
+      showToast('Playlist deleted', 'success')
     } catch (err) {
       console.error('Error deleting playlist:', err)
+      showToast('Failed to delete playlist', 'error')
     } finally {
       setDeleting(false)
     }

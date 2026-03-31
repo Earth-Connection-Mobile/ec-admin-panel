@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
+import { deleteFromR2 } from '../lib/media'
+import { useToast } from '../components/Toast'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 
@@ -10,6 +13,8 @@ function formatDate(dateStr) {
 }
 
 export default function Updates() {
+  const { session } = useAuth()
+  const { showToast } = useToast()
   const [updates, setUpdates] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -20,7 +25,7 @@ export default function Updates() {
     try {
       const { data, error } = await supabase
         .from('community_updates')
-        .select('id, title, is_pinned, published_at')
+        .select('id, title, is_pinned, published_at, cover_image_url')
         .order('published_at', { ascending: false })
       if (error) throw error
       setUpdates(data || [])
@@ -42,8 +47,10 @@ export default function Updates() {
         .eq('id', update.id)
       if (error) throw error
       setUpdates((prev) => prev.map((u) => u.id === update.id ? { ...u, is_pinned: !u.is_pinned } : u))
+      showToast(update.is_pinned ? 'Update unpinned' : 'Update pinned', 'success')
     } catch (err) {
       console.error('Error toggling pin:', err)
+      showToast('Failed to update pin status', 'error')
     } finally {
       setPinLoading(null)
     }
@@ -55,10 +62,18 @@ export default function Updates() {
     try {
       const { error } = await supabase.from('community_updates').delete().eq('id', deleteTarget.id)
       if (error) throw error
+
+      // Clean up R2 cover image
+      if (session && deleteTarget.cover_image_url) {
+        try { await deleteFromR2(deleteTarget.cover_image_url, session) } catch (_e) { void _e }
+      }
+
       setUpdates((prev) => prev.filter((u) => u.id !== deleteTarget.id))
       setDeleteTarget(null)
+      showToast('Update deleted', 'success')
     } catch (err) {
       console.error('Error deleting update:', err)
+      showToast('Failed to delete update', 'error')
     } finally {
       setDeleting(false)
     }
