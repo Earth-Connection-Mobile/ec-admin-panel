@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { uploadToR2, deleteFromR2, generateFileKey, getAudioDuration, formatDuration } from '../lib/media'
+import { uploadToR2, deleteFromR2, generateFileKey, getAudioDuration, formatDuration, fetchImageAsBlob } from '../lib/media'
 import FileUpload from '../components/FileUpload'
 import Modal from '../components/Modal'
 
