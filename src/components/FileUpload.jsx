@@ -32,6 +32,10 @@ export default function FileUpload({
   onFiles,
 }) {
   const [isDragOver, setIsDragOver] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
+  const [urlLoading, setUrlLoading] = useState(false)
+  const [urlError, setUrlError] = useState(null)
+  const [showUrlInput, setShowUrlInput] = useState(false)
   const inputRef = useRef(null)
 
   const handleDragOver = useCallback((e) => {
@@ -80,6 +84,28 @@ export default function FileUpload({
       inputRef.current.click()
     }
   }
+
+  const handleUrlSubmit = useCallback(async () => {
+    if (!urlInput.trim() || !onFile) return
+    setUrlLoading(true)
+    setUrlError(null)
+    try {
+      const res = await fetch(urlInput.trim())
+      if (!res.ok) throw new Error('fail')
+      const blob = await res.blob()
+      const ext = urlInput.split('.').pop().split('?')[0].toLowerCase()
+      const validExts = ['jpg', 'jpeg', 'png', 'webp', 'gif']
+      const filename = 'pasted-image.' + (validExts.includes(ext) ? ext : 'jpg')
+      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' })
+      onFile(file)
+      setUrlInput('')
+      setShowUrlInput(false)
+    } catch {
+      setUrlError('Could not load image from URL')
+    } finally {
+      setUrlLoading(false)
+    }
+  }, [urlInput, onFile])
 
   const formatSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B'
@@ -151,30 +177,47 @@ export default function FileUpload({
           </div>
         </div>
       ) : (
-        <div
-          onClick={handleClick}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`
-            flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors
-            ${isDragOver
-              ? 'border-[var(--ec-gold)] bg-[var(--ec-gold)]/5'
-              : 'border-[var(--ec-card-border)] bg-white hover:border-[var(--ec-gold)]/50 hover:bg-[var(--ec-gold)]/[0.02]'
-            }
-            ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-          `}
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 mb-2">
-            <svg className="w-5 h-5 text-[var(--ec-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
+        <div className="space-y-2">
+          <div
+            onClick={handleClick}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`
+              flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors
+              ${isDragOver
+                ? 'border-[var(--ec-gold)] bg-[var(--ec-gold)]/5'
+                : 'border-[var(--ec-card-border)] bg-white hover:border-[var(--ec-gold)]/50 hover:bg-[var(--ec-gold)]/[0.02]'
+              }
+              ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+            `}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 mb-2">
+              <svg className="w-5 h-5 text-[var(--ec-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+            </div>
+            <p className="text-sm text-[var(--ec-text-secondary)] font-body">
+              <span className="font-medium text-[var(--ec-gold)]">Click to browse</span> or drag and drop
+            </p>
+            {hint && (
+              <p className="mt-1 text-xs text-[var(--ec-text-secondary)]/70 font-body">{hint}</p>
+            )}
           </div>
-          <p className="text-sm text-[var(--ec-text-secondary)] font-body">
-            <span className="font-medium text-[var(--ec-gold)]">Click to browse</span> or drag and drop
-          </p>
-          {hint && (
-            <p className="mt-1 text-xs text-[var(--ec-text-secondary)]/70 font-body">{hint}</p>
+          {isImage && !showUrlInput && (
+            <button type="button" onClick={() => setShowUrlInput(true)} className="text-xs text-[var(--ec-text-secondary)] hover:text-[var(--ec-gold)] font-body transition-colors">
+              Or paste an image URL
+            </button>
+          )}
+          {isImage && showUrlInput && (
+            <div>
+              <div className="flex gap-2">
+                <input type="text" value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setUrlError(null) }} onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()} placeholder="https://example.com/image.jpg" className="flex-1 rounded-lg border border-[var(--ec-card-border)] bg-white px-3 py-2 text-sm text-[var(--ec-text)] font-body" />
+                <button type="button" onClick={handleUrlSubmit} disabled={urlLoading || !urlInput.trim()} className="rounded-lg bg-[var(--ec-gold)] px-3 py-2 text-sm font-medium text-[var(--ec-nav-bg)] font-body hover:bg-[var(--ec-gold-hover)] transition-colors disabled:opacity-50">{urlLoading ? '...' : 'Load'}</button>
+                <button type="button" onClick={() => { setShowUrlInput(false); setUrlInput(''); setUrlError(null) }} className="rounded-lg border border-[var(--ec-card-border)] px-2 py-2 text-sm text-[var(--ec-text-secondary)] hover:bg-gray-50 transition-colors">Cancel</button>
+              </div>
+              {urlError && <p className="text-xs text-[var(--ec-rust)] font-body mt-1">{urlError}</p>}
+            </div>
           )}
         </div>
       )}
