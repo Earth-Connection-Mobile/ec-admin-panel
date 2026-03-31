@@ -281,7 +281,28 @@ export default function PlaylistEdit() {
   }
 
   const handleAddTrack = (formData) => { setTracks((prev) => [...prev, { ...formData, id: crypto.randomUUID(), track_order: prev.length + 1, _status: 'new' }]); setShowAddTrack(false); setDirty(true) }
-  const handleUpdateTrack = (trackId, updates) => { setTracks((prev) => prev.map((t) => t.id === trackId ? { ...t, ...updates, _status: t._status === 'new' ? 'new' : 'modified' } : t)); setEditingTrackId(null); setDirty(true) }
+  const handleUpdateTrack = async (trackId, updates) => {
+    // Update local state
+    setTracks((prev) => prev.map((t) => t.id === trackId ? { ...t, ...updates } : t))
+    setEditingTrackId(null)
+    // Save directly to database
+    try {
+      const dbUpdates = {}
+      if (updates.title !== undefined) dbUpdates.title = updates.title
+      if (updates.artist_healer !== undefined) dbUpdates.artist_healer = updates.artist_healer
+      if (updates.audio_file_url !== undefined) dbUpdates.audio_file_url = updates.audio_file_url
+      if (updates.cover_art_url !== undefined) dbUpdates.cover_art_url = updates.cover_art_url
+      if (updates.duration_seconds !== undefined) dbUpdates.duration_seconds = updates.duration_seconds
+      if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await supabase.from('tracks').update(dbUpdates).eq('id', trackId)
+        if (error) throw error
+        showToast('Track updated', 'success')
+      }
+    } catch (err) {
+      console.error('Error saving track:', err)
+      showToast('Failed to save track', 'error')
+    }
+  }
 
   const handleDeleteTrack = async () => {
     if (!deleteTrackTarget) return
