@@ -23,7 +23,7 @@ function formatDate(dateStr) {
   }
 }
 
-export default function UpdateCard({ title, body, publishedAt }) {
+export default function UpdateCard({ title, body, publishedAt, coverImageUrl }) {
   const displayTitle = title || 'Untitled Update'
   // Strip markdown formatting for the preview body
   const plainBody = (body || '')
