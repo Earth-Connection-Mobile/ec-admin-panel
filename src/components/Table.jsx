@@ -25,7 +25,8 @@ export default function Table({
                 {columns.map((col) => (
                   <th
                     key={col.key}
-                    className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--ec-text-secondary)] font-body ${col.className || ''}`}
+                    style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                  className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--ec-text-secondary)] font-body ${col.className || ''}`}
                   >
                     {col.label}
                   </th>
@@ -76,6 +77,7 @@ export default function Table({
               {columns.map((col) => (
                 <th
                   key={col.key}
+                  style={col.width ? { width: col.width, minWidth: col.width } : undefined}
                   className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--ec-text-secondary)] font-body ${col.className || ''}`}
                 >
                   {col.label}
@@ -94,6 +96,7 @@ export default function Table({
                 {columns.map((col) => (
                   <td
                     key={col.key}
+                    style={col.width ? { width: col.width, minWidth: col.width } : undefined}
                     className={`px-4 py-3 text-sm text-[var(--ec-text)] font-body ${col.className || ''}`}
                   >
                     {col.render ? col.render(row) : row[col.key]}

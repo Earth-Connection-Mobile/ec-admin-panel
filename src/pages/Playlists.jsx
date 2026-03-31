@@ -94,6 +94,7 @@ export default function Playlists() {
     {
       key: 'cover',
       label: '',
+      width: 116,
       render: (row) => (
         thumbUrls[row.id]
           ? <img src={thumbUrls[row.id]} alt="" style={{ width: 100, height: 100, minWidth: 100, minHeight: 100 }} className="rounded-lg object-cover" />
