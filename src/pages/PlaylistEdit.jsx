@@ -149,10 +149,9 @@ function TrackTable({ tracks, editingTrackId, onEdit, onUpdate, onDelete, onDrag
           </tr>
         </thead>
         <tbody>
-          {tracks.map((track, index) => editingTrackId === track.id
-            ? <tr key={track.id}><td colSpan={7} className="p-3"><TrackForm initialData={track} onSave={(data) => onUpdate(track.id, data)} onCancel={() => onEdit(null)} session={session} /></td></tr>
-            : <TrackRow key={track.id} track={track} index={index} onEdit={onEdit} onDelete={onDelete} onDragStart={onDragStart} onDragEnter={onDragEnter} onDragEnd={onDragEnd} />
-          )}
+          {tracks.map((track, index) => (
+            <TrackRow key={track.id} track={track} index={index} onEdit={onEdit} onDelete={onDelete} onDragStart={onDragStart} onDragEnter={onDragEnter} onDragEnd={onDragEnd} />
+          ))}
         </tbody>
       </table>
     </div>
@@ -379,6 +378,25 @@ export default function PlaylistEdit() {
           <TrackTable tracks={tracks} editingTrackId={editingTrackId} onEdit={setEditingTrackId} onUpdate={handleUpdateTrack} onDelete={setDeleteTrackTarget} onDragStart={handleDragStart} onDragEnter={handleDragEnter} onDragEnd={handleDragEnd} session={session} />
         )}
       </div>
+      {/* Edit Track Modal */}
+      {editingTrackId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-heading text-[20px] font-semibold text-[var(--ec-text)]">Edit Track</h3>
+              <button onClick={() => setEditingTrackId(null)} className="text-[var(--ec-text-secondary)] hover:text-[var(--ec-text)]">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <TrackForm
+              initialData={tracks.find(t => t.id === editingTrackId)}
+              onSave={(data) => handleUpdateTrack(editingTrackId, data)}
+              onCancel={() => setEditingTrackId(null)}
+              session={session}
+            />
+          </div>
+        </div>
+      )}
       <Modal open={!!deleteTrackTarget} onClose={() => setDeleteTrackTarget(null)} onConfirm={handleDeleteTrack} title="Delete Track" message={trackDeleteMsg} confirmLabel="Delete" confirmColor="rust" loading={deletingTrack} />
     </div>
   )
