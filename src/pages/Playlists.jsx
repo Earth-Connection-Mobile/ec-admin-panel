@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
+import { fetchImageAsBlob } from '../lib/media'
 import Table from '../components/Table'
 import Badge from '../components/Badge'
 import Modal from '../components/Modal'
@@ -17,17 +19,19 @@ const phaseConfig = {
 }
 
 export default function Playlists() {
+  const { session } = useAuth()
   const [playlists, setPlaylists] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [thumbUrls, setThumbUrls] = useState({})
   const [featureLoading, setFeatureLoading] = useState(null)
 
   const fetchPlaylists = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('playlists')
-        .select('id, title, phase_tag, is_featured, published_at, created_at')
+        .select('id, title, phase_tag, is_featured, published_at, created_at, cover_art_url')
         .order('published_at', { ascending: false })
       if (error) throw error
       const playlistIds = (data || []).map((p) => p.id)
@@ -45,6 +49,16 @@ export default function Playlists() {
   }, [])
 
   useEffect(() => { fetchPlaylists() }, [fetchPlaylists])
+
+  useEffect(() => {
+    if (!session || !playlists.length) return
+    playlists.forEach(async (p) => {
+      if (p.cover_art_url && !thumbUrls[p.id]) {
+        const url = await fetchImageAsBlob(p.cover_art_url, session)
+        if (url) setThumbUrls(prev => ({ ...prev, [p.id]: url }))
+      }
+    })
+  }, [playlists, session, thumbUrls])
 
   const handleToggleFeatured = async (playlist) => {
     setFeatureLoading(playlist.id)
@@ -77,6 +91,15 @@ export default function Playlists() {
   }
 
   const columns = [
+    {
+      key: 'cover',
+      label: '',
+      render: (row) => (
+        thumbUrls[row.id]
+          ? <img src={thumbUrls[row.id]} alt="" className="w-10 h-10 rounded-lg object-cover" />
+          : <div className="w-10 h-10 rounded-lg bg-[var(--ec-gold)]/10 flex items-center justify-center"><svg className="w-5 h-5 text-[var(--ec-gold)]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" /></svg></div>
+      ),
+    },
     {
       key: 'title',
       label: 'Title',
