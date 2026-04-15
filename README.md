@@ -182,6 +182,10 @@ Runs at `http://localhost:5173`.
 
 ## Deployment
 
+Hosted on **Cloudflare Pages** at `https://ec-admin-panel.pages.dev`.
+
+**Cloudflare Dashboard location:** Build → Compute → Workers & Pages (same place as the media worker).
+
 Pushes to `main` trigger GitHub Actions:
 
 1. Install Node v20 + dependencies (`npm ci`)
