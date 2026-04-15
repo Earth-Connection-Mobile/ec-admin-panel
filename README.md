@@ -2,6 +2,8 @@
 
 Admin dashboard for the [Earth Connection Community](https://github.com/Earth-Connection-Mobile/earth-connection-mobile) platform. Manage playlists, tracks, videos, community updates, and members.
 
+**Currently hosted at:** [ec-admin-panel.pages.dev](https://ec-admin-panel.pages.dev) (Cloudflare Pages)
+
 ---
 
 ## Tech Stack
