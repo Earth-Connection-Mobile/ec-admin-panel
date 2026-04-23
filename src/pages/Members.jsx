@@ -17,35 +17,94 @@ const filterTabs = [
   { key: 'inactive', label: 'Inactive' },
 ]
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function parseCsvRows(text) {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  const parsed = []
+  const skipped = []
+  for (let i = 0; i < lines.length; i++) {
+    const parts = lines[i].split(',').map((p) => p.trim())
+    if (parts.length < 3) {
+      skipped.push({ line: i + 1, text: lines[i], reason: 'need 3 columns: name, phone, email' })
+      continue
+    }
+    const [full_name, phone, email] = parts
+    if (!EMAIL_REGEX.test(email)) {
+      skipped.push({ line: i + 1, text: lines[i], reason: 'invalid email' })
+      continue
+    }
+    if (!full_name) {
+      skipped.push({ line: i + 1, text: lines[i], reason: 'missing name' })
+      continue
+    }
+    parsed.push({ full_name, phone, email })
+  }
+  return { parsed, skipped }
+}
+
+async function sendOneInvite({ workerUrl, token, email, full_name, phone }) {
+  const response = await fetch(workerUrl + '/invite', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, full_name, phone }),
+  })
+  if (!response.ok) {
+    const text = await response.text().catch(() => 'Invite failed')
+    throw new Error(text)
+  }
+}
+
 function InviteModal({ open, onClose }) {
   const { session } = useAuth()
   const { showToast } = useToast()
+  const [mode, setMode] = useState('single')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [csvText, setCsvText] = useState('')
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
-  const inputRef = useRef(null)
+  const [bulkProgress, setBulkProgress] = useState(null)
+  const [bulkResults, setBulkResults] = useState(null)
+  const firstInputRef = useRef(null)
 
   useEffect(() => {
     if (open) {
+      setMode('single')
+      setFullName('')
+      setPhone('')
       setEmail('')
+      setCsvText('')
       setResult(null)
+      setBulkProgress(null)
+      setBulkResults(null)
       setSending(false)
-      setTimeout(() => inputRef.current?.focus(), 100)
+      setTimeout(() => firstInputRef.current?.focus(), 100)
     }
   }, [open])
 
-  const handleSend = async () => {
-    const trimmed = email.trim()
-    if (!trimmed) {
-      setResult({ type: 'error', message: 'Please enter an email address.' })
+  const { parsed, skipped } = useMemo(() => parseCsvRows(csvText), [csvText])
+
+  const handleSendSingle = async () => {
+    const trimmedEmail = email.trim()
+    const trimmedName = fullName.trim()
+    const trimmedPhone = phone.trim()
+    if (!trimmedName) {
+      setResult({ type: 'error', message: 'Please enter a name.' })
       return
     }
-    // Basic email validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    if (!trimmedPhone) {
+      setResult({ type: 'error', message: 'Please enter a phone number.' })
+      return
+    }
+    if (!trimmedEmail || !EMAIL_REGEX.test(trimmedEmail)) {
       setResult({ type: 'error', message: 'Please enter a valid email address.' })
       return
     }
-
     if (!session) {
       setResult({ type: 'error', message: 'Session expired. Please refresh the page.' })
       return
@@ -54,72 +113,206 @@ function InviteModal({ open, onClose }) {
     setSending(true)
     setResult(null)
     try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL
-      const response = await fetch(workerUrl + '/invite', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: trimmed }),
+      await sendOneInvite({
+        workerUrl: import.meta.env.VITE_WORKER_URL,
+        token: session.access_token,
+        email: trimmedEmail,
+        full_name: trimmedName,
+        phone: trimmedPhone,
       })
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => 'Invite failed')
-        throw new Error(text)
-      }
-
-      setResult({ type: 'success', message: 'Invitation sent to ' + trimmed + '!' })
+      setResult({ type: 'success', message: 'Invitation sent to ' + trimmedEmail + '!' })
+      setFullName('')
+      setPhone('')
       setEmail('')
-      showToast('Invitation sent to ' + trimmed, 'success')
+      showToast('Invitation sent to ' + trimmedEmail, 'success')
     } catch (err) {
       console.error('Invite error:', err)
-      setResult({
-        type: 'error',
-        message: err.message || 'Failed to send invitation. Please try again.',
-      })
+      setResult({ type: 'error', message: err.message || 'Failed to send invitation. Please try again.' })
       showToast('Failed to send invitation', 'error')
     } finally {
       setSending(false)
     }
   }
 
+  const handleSendBulk = async () => {
+    if (!session) {
+      setResult({ type: 'error', message: 'Session expired. Please refresh the page.' })
+      return
+    }
+    if (parsed.length === 0) {
+      setResult({ type: 'error', message: 'No valid rows to invite.' })
+      return
+    }
+
+    setSending(true)
+    setResult(null)
+    setBulkResults(null)
+    setBulkProgress({ current: 0, total: parsed.length })
+
+    const workerUrl = import.meta.env.VITE_WORKER_URL
+    const succeeded = []
+    const failed = skipped.map((s) => ({ row: s.text, reason: s.reason }))
+
+    for (let i = 0; i < parsed.length; i++) {
+      const row = parsed[i]
+      setBulkProgress({ current: i + 1, total: parsed.length })
+      try {
+        await sendOneInvite({
+          workerUrl,
+          token: session.access_token,
+          email: row.email,
+          full_name: row.full_name,
+          phone: row.phone,
+        })
+        succeeded.push(row.email)
+      } catch (err) {
+        failed.push({ row: row.email, reason: err.message || 'failed' })
+      }
+    }
+
+    setSending(false)
+    setBulkProgress(null)
+    setBulkResults({ succeeded, failed })
+    showToast('Sent ' + succeeded.length + ' of ' + (parsed.length + skipped.length) + ' invites', succeeded.length > 0 ? 'success' : 'error')
+  }
+
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !sending) {
-      handleSend()
+    if (e.key === 'Enter' && mode === 'single' && !sending && !e.shiftKey) {
+      e.preventDefault()
+      handleSendSingle()
     }
   }
 
   if (!open) return null
 
+  const TabBtn = ({ value, label }) => (
+    <button
+      type="button"
+      onClick={() => { if (!sending) setMode(value) }}
+      className={
+        'flex-1 rounded-md px-3 py-1.5 text-xs font-medium font-body transition-colors ' +
+        (mode === value
+          ? 'bg-white text-[var(--ec-text)] shadow-sm'
+          : 'text-[var(--ec-text-secondary)] hover:text-[var(--ec-text)]')
+      }
+      disabled={sending}
+    >
+      {label}
+    </button>
+  )
+
+  const inputClass = 'w-full rounded-lg border border-[var(--ec-card-border)] bg-white px-3 py-3 text-sm text-[var(--ec-text)] font-body placeholder:text-[var(--ec-text-secondary)]/50 disabled:opacity-60'
+  const labelClass = 'block text-[13px] font-medium text-[var(--ec-text)] font-body mb-1.5'
+
+  const isDone = result?.type === 'success' || !!bulkResults
+  const canSend = mode === 'single' || parsed.length > 0
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => { if (e.target === e.currentTarget && !sending) onClose() }}
     >
-      <div className="w-full max-w-md rounded-xl border border-[var(--ec-card-border)] bg-white p-6 shadow-lg">
-        <h3 className="font-heading text-[22px] font-semibold text-[var(--ec-text)]">
-          Invite Member
-        </h3>
+      <div className="w-full max-w-lg rounded-xl border border-[var(--ec-card-border)] bg-white p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+        <h3 className="font-heading text-[22px] font-semibold text-[var(--ec-text)]">Invite Member</h3>
         <p className="mt-2 text-sm text-[var(--ec-text-secondary)] font-body">
-          Send an invitation email to a new community member. They will receive a magic link to create their account.
+          Send invitation emails with App Store and Play Store download links.
         </p>
 
-        <div className="mt-4">
-          <label className="block text-[13px] font-medium text-[var(--ec-text)] font-body mb-1.5">
-            Email Address
-          </label>
-          <input
-            ref={inputRef}
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="newmember@example.com"
-            disabled={sending}
-            className="w-full rounded-lg border border-[var(--ec-card-border)] bg-white px-3 py-3 text-sm text-[var(--ec-text)] font-body placeholder:text-[var(--ec-text-secondary)]/50 disabled:opacity-60"
-          />
+        <div className="mt-4 flex gap-1 rounded-lg bg-gray-100 p-1">
+          <TabBtn value="single" label="Single" />
+          <TabBtn value="bulk" label="Bulk (CSV)" />
         </div>
+
+        {mode === 'single' && (
+          <>
+            <div className="mt-3">
+              <label className={labelClass}>Full Name</label>
+              <input
+                ref={firstInputRef}
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Jane Doe"
+                disabled={sending}
+                className={inputClass}
+              />
+            </div>
+            <div className="mt-3">
+              <label className={labelClass}>Phone</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="+1 555 555 5555"
+                disabled={sending}
+                className={inputClass}
+              />
+            </div>
+            <div className="mt-3">
+              <label className={labelClass}>Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="jane@example.com"
+                disabled={sending}
+                className={inputClass}
+              />
+            </div>
+          </>
+        )}
+
+        {mode === 'bulk' && (
+          <div className="mt-4">
+            <label className="block text-[13px] font-medium text-[var(--ec-text)] font-body mb-1.5">
+              Paste CSV — one per line, columns: name, phone, email
+            </label>
+            <textarea
+              ref={firstInputRef}
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              placeholder={'Jane Doe, +1 555 555 5555, jane@example.com\nJohn Smith, +1 555 123 4567, john@example.com'}
+              rows={8}
+              disabled={sending}
+              className="w-full rounded-lg border border-[var(--ec-card-border)] bg-white px-3 py-3 text-sm text-[var(--ec-text)] font-body placeholder:text-[var(--ec-text-secondary)]/50 disabled:opacity-60 font-mono"
+            />
+            {csvText.trim() && (
+              <p className="mt-2 text-xs text-[var(--ec-text-secondary)] font-body">
+                {parsed.length} valid row{parsed.length === 1 ? '' : 's'}
+                {skipped.length > 0 ? ', ' + skipped.length + ' will be skipped' : ''}
+              </p>
+            )}
+          </div>
+        )}
+
+        {bulkProgress && (
+          <div className="mt-4 rounded-lg border border-[var(--ec-card-border)] bg-gray-50 px-3 py-2 text-sm font-body text-[var(--ec-text)]">
+            Sending {bulkProgress.current} of {bulkProgress.total}...
+          </div>
+        )}
+
+        {bulkResults && (
+          <div className="mt-4 rounded-lg border border-[var(--ec-card-border)] bg-gray-50 px-3 py-2 text-sm font-body">
+            <div className="text-[var(--ec-forest)] font-medium">
+              Sent {bulkResults.succeeded.length} invitation{bulkResults.succeeded.length === 1 ? '' : 's'}.
+            </div>
+            {bulkResults.failed.length > 0 && (
+              <div className="mt-2">
+                <div className="text-[var(--ec-rust)] font-medium">
+                  {bulkResults.failed.length} failed:
+                </div>
+                <ul className="mt-1 space-y-0.5 text-xs text-[var(--ec-text-secondary)]">
+                  {bulkResults.failed.map((f, i) => (
+                    <li key={i}><span className="font-mono">{f.row}</span> — {f.reason}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {result && (
           <div
@@ -140,12 +333,12 @@ function InviteModal({ open, onClose }) {
             disabled={sending}
             className="rounded-lg border border-[var(--ec-card-border)] bg-white px-4 py-2 text-sm font-medium text-[var(--ec-text)] font-body hover:bg-gray-50 transition-colors disabled:opacity-60"
           >
-            {result?.type === 'success' ? 'Done' : 'Cancel'}
+            {isDone ? 'Done' : 'Cancel'}
           </button>
-          {result?.type !== 'success' && (
+          {!isDone && (
             <button
-              onClick={handleSend}
-              disabled={sending}
+              onClick={mode === 'single' ? handleSendSingle : handleSendBulk}
+              disabled={sending || !canSend}
               className="rounded-lg bg-[var(--ec-gold)] px-4 py-2 text-sm font-medium text-[var(--ec-nav-bg)] font-body hover:bg-[var(--ec-gold-hover)] transition-colors disabled:opacity-60"
             >
               {sending ? (
@@ -154,7 +347,7 @@ function InviteModal({ open, onClose }) {
                   Sending...
                 </span>
               ) : (
-                'Send Invite'
+                mode === 'single' ? 'Send Invite' : 'Send ' + parsed.length + ' Invite' + (parsed.length === 1 ? '' : 's')
               )}
             </button>
           )}
@@ -179,7 +372,7 @@ export default function Members() {
     try {
       const { data, error } = await supabase
         .from('members')
-        .select('id, email, role, status, created_at')
+        .select('id, email, full_name, phone, role, status, created_at')
         .order('created_at', { ascending: false })
       if (error) throw error
       setMembers(data || [])
