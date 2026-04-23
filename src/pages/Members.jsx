@@ -58,7 +58,7 @@ async function sendOneInvite({ workerUrl, token, email, full_name, phone }) {
   }
 }
 
-function InviteModal({ open, onClose }) {
+function InviteModal({ open, onClose, onInvited }) {
   const { session } = useAuth()
   const { showToast } = useToast()
   const [mode, setMode] = useState('single')
@@ -125,6 +125,7 @@ function InviteModal({ open, onClose }) {
       setPhone('')
       setEmail('')
       showToast('Invitation sent to ' + trimmedEmail, 'success')
+      onInvited?.()
     } catch (err) {
       console.error('Invite error:', err)
       setResult({ type: 'error', message: err.message || 'Failed to send invitation. Please try again.' })
@@ -174,6 +175,7 @@ function InviteModal({ open, onClose }) {
     setBulkProgress(null)
     setBulkResults({ succeeded, failed })
     showToast('Sent ' + succeeded.length + ' of ' + (parsed.length + skipped.length) + ' invites', succeeded.length > 0 ? 'success' : 'error')
+    if (succeeded.length > 0) onInvited?.()
   }
 
   const handleKeyDown = (e) => {
@@ -534,6 +536,7 @@ export default function Members() {
       <InviteModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
+        onInvited={fetchMembers}
       />
     </div>
   )
